@@ -207,24 +207,6 @@ The current implementation contains the following modules in one Verilog file:
 
 ---
 
-## Current Status
-
-| Part | Status |
-|---|:---:|
-| FIFO architecture | ✅ Complete |
-| Write controller | ✅ Complete |
-| Read controller | ✅ Complete |
-| Gray-code pointers | ✅ Complete |
-| CDC synchronizers | ✅ Complete |
-| Full/empty logic | ✅ Complete |
-| Overflow/underflow logic | ✅ Complete |
-| Reset synchronizers | ✅ Complete |
-| Reset handshake | ✅ Complete |
-| FIFO memory | ✅ Complete |
-| Complete RTL | ✅ Complete |
-| Functional verification | 🔄 In Progress |
-
----
 
 ## Project Structure
 
@@ -262,8 +244,6 @@ The important parts of the design are:
 
 ---
 
-## Verification
 
-The RTL implementation is complete and **functional verification is currently in progress**.
 
-The verification phase will be used to check the FIFO operation, pointer movement, full/empty conditions, overflow/underflow behavior, clock-domain crossing, and reset behavior.
+
