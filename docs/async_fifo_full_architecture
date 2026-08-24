@@ -1,0 +1,218 @@
+<svg width="1750" height="1160" viewBox="0 0 1750 1160" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#333" stroke-width="1.5"/>
+  </marker>
+  <marker id="arrowT" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#0F6E56" stroke-width="1.5"/>
+  </marker>
+  <marker id="arrowC" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#993C1D" stroke-width="1.5"/>
+  </marker>
+  <marker id="arrowP" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#534AB7" stroke-width="1.5"/>
+  </marker>
+</defs>
+
+<rect x="0" y="0" width="1750" height="1160" fill="#FFFFFF"/>
+<text x="875" y="30" text-anchor="middle" font-size="18" font-weight="700" fill="#111">async_fifo — full port-level architecture</text>
+
+<!-- ===================== WRITE DOMAIN LABEL ===================== -->
+<text x="350" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#0F6E56">WRITE CLOCK DOMAIN (wr_clk)</text>
+<text x="1400" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#993C1D">READ CLOCK DOMAIN (rd_clk)</text>
+
+<!-- ===================== EXTERNAL TOP PORTS (WRITE) ===================== -->
+<text x="220" y="80" text-anchor="middle" font-size="11" fill="#111">wr_clk</text>
+<line x1="220" y1="85" x2="220" y2="90" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="480" y="80" text-anchor="middle" font-size="11" fill="#111">wr_rst_n</text>
+<line x1="480" y1="85" x2="480" y2="90" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+<!-- ===================== EXTERNAL TOP PORTS (READ) ===================== -->
+<text x="1270" y="80" text-anchor="middle" font-size="11" fill="#111">rd_clk</text>
+<line x1="1270" y1="85" x2="1270" y2="90" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="1530" y="80" text-anchor="middle" font-size="11" fill="#111">rd_rst_n</text>
+<line x1="1530" y1="85" x2="1530" y2="90" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+<!-- ===================== BOX: u_wr_reset_sync ===================== -->
+<rect x="140" y="90" width="420" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+<text x="350" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#2C2C2A">u_wr_reset_sync</text>
+<text x="350" y="126" text-anchor="middle" font-size="10" fill="#5F5E5A">(reset_sync)</text>
+<text x="160" y="144" font-size="11" fill="#2C2C2A">in:  clk = wr_clk,  arst_n = wr_rst_n</text>
+<text x="160" y="160" font-size="11" fill="#2C2C2A">out: srst_n = wr_local_rst_n</text>
+
+<!-- ===================== BOX: u_rd_reset_sync ===================== -->
+<rect x="1190" y="90" width="420" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+<text x="1400" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#2C2C2A">u_rd_reset_sync</text>
+<text x="1400" y="126" text-anchor="middle" font-size="10" fill="#5F5E5A">(reset_sync)</text>
+<text x="1210" y="144" font-size="11" fill="#2C2C2A">in:  clk = rd_clk,  arst_n = rd_rst_n</text>
+<text x="1210" y="160" font-size="11" fill="#2C2C2A">out: srst_n = rd_local_rst_n</text>
+
+<!-- reset chain, local -->
+<line x1="350" y1="170" x2="350" y2="230" stroke="#5F5E5A" stroke-width="1.3" marker-end="url(#arrow)"/>
+<line x1="1400" y1="170" x2="1400" y2="230" stroke="#5F5E5A" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+<!-- ===================== BOX: u_wr_handshake ===================== -->
+<rect x="140" y="230" width="420" height="120" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+<text x="350" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#2C2C2A">u_wr_handshake</text>
+<text x="350" y="266" text-anchor="middle" font-size="10" fill="#5F5E5A">(reset_handshake)</text>
+<text x="160" y="284" font-size="11" fill="#2C2C2A">in:  clk = wr_clk, rst_n = wr_local_rst_n,</text>
+<text x="160" y="299" font-size="11" fill="#2C2C2A">     remote_init_done = rd_init_done,</text>
+<text x="160" y="314" font-size="11" fill="#2C2C2A">     remote_ready = rd_ready</text>
+<text x="160" y="332" font-size="11" fill="#2C2C2A">out: init_done=wr_init_done, ready=wr_ready,</text>
+<text x="160" y="347" font-size="11" fill="#2C2C2A">     remote_ready_sync=wr_remote_ready_sync</text>
+
+<!-- ===================== BOX: u_rd_handshake ===================== -->
+<rect x="1190" y="230" width="420" height="120" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+<text x="1400" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#2C2C2A">u_rd_handshake</text>
+<text x="1400" y="266" text-anchor="middle" font-size="10" fill="#5F5E5A">(reset_handshake)</text>
+<text x="1210" y="284" font-size="11" fill="#2C2C2A">in:  clk = rd_clk, rst_n = rd_local_rst_n,</text>
+<text x="1210" y="299" font-size="11" fill="#2C2C2A">     remote_init_done = wr_init_done,</text>
+<text x="1210" y="314" font-size="11" fill="#2C2C2A">     remote_ready = wr_ready</text>
+<text x="1210" y="332" font-size="11" fill="#2C2C2A">out: init_done=rd_init_done, ready=rd_ready,</text>
+<text x="1210" y="347" font-size="11" fill="#2C2C2A">     remote_ready_sync=rd_remote_ready_sync</text>
+
+<!-- cross-domain handshake wires -->
+<path d="M560,258 L760,258 L760,300 L1190,300" fill="none" stroke="#0F6E56" stroke-width="1.3" marker-end="url(#arrowT)"/>
+<text x="640" y="252" font-size="10" fill="#0F6E56">wr_init_done</text>
+<path d="M560,278 L800,278 L800,320 L1190,320" fill="none" stroke="#0F6E56" stroke-width="1.3" marker-end="url(#arrowT)"/>
+<text x="640" y="272" font-size="10" fill="#0F6E56">wr_ready</text>
+
+<path d="M1190,258 L950,258 L950,300 L560,300" fill="none" stroke="#993C1D" stroke-width="1.3" marker-end="url(#arrowC)"/>
+<text x="990" y="252" font-size="10" fill="#993C1D">rd_init_done</text>
+<path d="M1190,278 L910,278 L910,320 L560,320" fill="none" stroke="#993C1D" stroke-width="1.3" marker-end="url(#arrowC)"/>
+<text x="990" y="272" font-size="10" fill="#993C1D">rd_ready</text>
+
+<!-- handshake out -> AND1 (fifo_enable) -->
+<line x1="310" y1="350" x2="310" y2="390" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="200" y="375" font-size="10" fill="#2C2C2A">wr_ready</text>
+<line x1="390" y1="350" x2="390" y2="390" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="405" y="375" font-size="10" fill="#2C2C2A">wr_remote_ready_sync</text>
+
+<line x1="1360" y1="350" x2="1360" y2="390" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="1240" y="375" font-size="10" fill="#2C2C2A">rd_ready</text>
+<line x1="1440" y1="350" x2="1440" y2="390" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="1455" y="375" font-size="10" fill="#2C2C2A">rd_remote_ready_sync</text>
+
+<!-- ===================== AND gate: wr_fifo_enable ===================== -->
+<rect x="255" y="390" width="190" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+<text x="350" y="410" text-anchor="middle" font-size="11" font-weight="700" fill="#412402">&amp;  wr_fifo_enable</text>
+<text x="350" y="426" text-anchor="middle" font-size="9.5" fill="#633806">wr_ready AND wr_remote_ready_sync</text>
+
+<rect x="1305" y="390" width="190" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+<text x="1400" y="410" text-anchor="middle" font-size="11" font-weight="700" fill="#412402">&amp;  rd_fifo_enable</text>
+<text x="1400" y="426" text-anchor="middle" font-size="9.5" fill="#633806">rd_ready AND rd_remote_ready_sync</text>
+
+<line x1="350" y1="440" x2="350" y2="470" stroke="#854F0B" stroke-width="1.3" marker-end="url(#arrow)"/>
+<line x1="1400" y1="440" x2="1400" y2="470" stroke="#854F0B" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+<!-- ===================== BOX: u_write_controller ===================== -->
+<rect x="140" y="470" width="420" height="150" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+<text x="350" y="490" text-anchor="middle" font-size="13" font-weight="700" fill="#04342C">u_write_controller</text>
+<text x="350" y="506" text-anchor="middle" font-size="10" fill="#0F6E56">(write_controller)</text>
+<text x="160" y="524" font-size="11" fill="#04342C">in:  wr_clk, wr_rst_n=wr_local_rst_n, wr_en,</text>
+<text x="160" y="539" font-size="11" fill="#04342C">     fifo_enable=wr_fifo_enable,</text>
+<text x="160" y="554" font-size="11" fill="#04342C">     rd_ptr_gray_sync</text>
+<text x="160" y="572" font-size="11" fill="#04342C">out: wr_addr, wr_ptr_bin (unused at top level),</text>
+<text x="160" y="587" font-size="11" fill="#04342C">     wr_ptr_gray, full, overflow</text>
+
+<!-- ===================== BOX: u_read_controller ===================== -->
+<rect x="1190" y="470" width="420" height="150" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="1.2"/>
+<text x="1400" y="490" text-anchor="middle" font-size="13" font-weight="700" fill="#4A1B0C">u_read_controller</text>
+<text x="1400" y="506" text-anchor="middle" font-size="10" fill="#993C1D">(read_controller)</text>
+<text x="1210" y="524" font-size="11" fill="#4A1B0C">in:  rd_clk, rd_rst_n=rd_local_rst_n, rd_en,</text>
+<text x="1210" y="539" font-size="11" fill="#4A1B0C">     fifo_enable=rd_fifo_enable,</text>
+<text x="1210" y="554" font-size="11" fill="#4A1B0C">     wr_ptr_gray_sync</text>
+<text x="1210" y="572" font-size="11" fill="#4A1B0C">out: rd_addr, rd_ptr_bin (unused at top level),</text>
+<text x="1210" y="587" font-size="11" fill="#4A1B0C">     rd_ptr_gray, empty, underflow</text>
+
+<!-- external wr_en in, full/overflow out (left margin) -->
+<text x="60" y="524" text-anchor="middle" font-size="11" fill="#111">wr_en</text>
+<line x1="75" y1="524" x2="138" y2="524" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="60" y="565" text-anchor="middle" font-size="11" fill="#111">full</text>
+<line x1="140" y1="565" x2="80" y2="565" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="60" y="590" text-anchor="middle" font-size="11" fill="#111">overflow</text>
+<line x1="140" y1="590" x2="90" y2="590" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+<!-- external rd_en in, empty/underflow out (right margin) -->
+<text x="1690" y="524" text-anchor="middle" font-size="11" fill="#111">rd_en</text>
+<line x1="1675" y1="524" x2="1612" y2="524" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="1690" y="565" text-anchor="middle" font-size="11" fill="#111">empty</text>
+<line x1="1610" y1="565" x2="1670" y2="565" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="1690" y="590" text-anchor="middle" font-size="11" fill="#111">underflow</text>
+<line x1="1610" y1="590" x2="1660" y2="590" stroke="#333" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+<!-- pointer cross-domain wires -->
+<path d="M560,545 L860,545 L860,700 L1190,700" fill="none" stroke="#0F6E56" stroke-width="1.4" marker-end="url(#arrowT)"/>
+<text x="640" y="539" font-size="10" fill="#0F6E56">wr_ptr_gray</text>
+<path d="M1190,565 L890,565 L890,720 L560,720" fill="none" stroke="#993C1D" stroke-width="1.4" marker-end="url(#arrowC)"/>
+<text x="950" y="559" font-size="10" fill="#993C1D">rd_ptr_gray</text>
+
+<!-- ===================== BOX: u_sync_read_to_write ===================== -->
+<rect x="140" y="660" width="420" height="90" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+<text x="350" y="680" text-anchor="middle" font-size="13" font-weight="700" fill="#26215C">u_sync_read_to_write</text>
+<text x="350" y="696" text-anchor="middle" font-size="10" fill="#534AB7">(cdc_sync, 2-FF)</text>
+<text x="160" y="714" font-size="11" fill="#26215C">in:  clk=wr_clk, rst_n=wr_local_rst_n,</text>
+<text x="160" y="729" font-size="11" fill="#26215C">     async_ptr = rd_ptr_gray</text>
+<text x="160" y="744" font-size="11" fill="#26215C">out: sync_ptr = rd_ptr_gray_sync</text>
+
+<!-- ===================== BOX: u_sync_write_to_read ===================== -->
+<rect x="1190" y="660" width="420" height="90" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+<text x="1400" y="680" text-anchor="middle" font-size="13" font-weight="700" fill="#26215C">u_sync_write_to_read</text>
+<text x="1400" y="696" text-anchor="middle" font-size="10" fill="#534AB7">(cdc_sync, 2-FF)</text>
+<text x="1210" y="714" font-size="11" fill="#26215C">in:  clk=rd_clk, rst_n=rd_local_rst_n,</text>
+<text x="1210" y="729" font-size="11" fill="#26215C">     async_ptr = wr_ptr_gray</text>
+<text x="1210" y="744" font-size="11" fill="#26215C">out: sync_ptr = wr_ptr_gray_sync</text>
+
+<!-- local feedback: cdc sync out -> controller in (rd_ptr_gray_sync / wr_ptr_gray_sync) -->
+<path d="M220,660 L220,620" fill="none" stroke="#534AB7" stroke-width="1.3" marker-end="url(#arrowP)"/>
+<text x="60" y="645" font-size="10" fill="#534AB7">rd_ptr_gray_sync</text>
+<path d="M1480,660 L1480,620" fill="none" stroke="#534AB7" stroke-width="1.3" marker-end="url(#arrowP)"/>
+<text x="1495" y="645" font-size="10" fill="#534AB7">wr_ptr_gray_sync</text>
+
+<!-- ===================== AND gate: memory write/read enable ===================== -->
+<rect x="255" y="790" width="190" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+<text x="350" y="810" text-anchor="middle" font-size="11" font-weight="700" fill="#412402">&amp;  mem_wr_en</text>
+<text x="350" y="826" text-anchor="middle" font-size="9.5" fill="#633806">wr_en AND !full AND wr_fifo_enable</text>
+
+<rect x="1305" y="790" width="190" height="50" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+<text x="1400" y="810" text-anchor="middle" font-size="11" font-weight="700" fill="#412402">&amp;  mem_rd_en</text>
+<text x="1400" y="826" text-anchor="middle" font-size="9.5" fill="#633806">rd_en AND !empty AND rd_fifo_enable</text>
+
+<!-- wr_addr / rd_addr routed around the CDC boxes via outer margin -->
+<path d="M250,620 L100,620 L100,860 L650,860 L650,890" fill="none" stroke="#0F6E56" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="45" y="700" font-size="10" fill="#0F6E56" transform="rotate(-90 45 700)">wr_addr</text>
+<path d="M1500,620 L1650,620 L1650,860 L1100,860 L1100,890" fill="none" stroke="#993C1D" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="1705" y="700" font-size="10" fill="#993C1D" transform="rotate(90 1705 700)">rd_addr</text>
+
+<!-- wr_data external straight to memory (net-label style, short local run) -->
+<text x="60" y="905" text-anchor="middle" font-size="11" fill="#111">wr_data</text>
+<path d="M75,905 L595,905" fill="none" stroke="#333" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="1690" y="905" text-anchor="middle" font-size="11" fill="#111">rd_data</text>
+<path d="M1675,905 L1155,905" fill="none" stroke="#333" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+<!-- AND gates feed memory (net-label style: same-name dashed stubs, avoids long reroutes) -->
+<line x1="350" y1="840" x2="350" y2="880" stroke="#854F0B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="350" y="860" text-anchor="middle" font-size="9.5" fill="#633806">mem_wr_en</text>
+<line x1="1400" y1="840" x2="1400" y2="880" stroke="#854F0B" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="1400" y="860" text-anchor="middle" font-size="9.5" fill="#633806">mem_rd_en</text>
+
+<!-- ===================== BOX: u_fifo_memory ===================== -->
+<rect x="595" y="890" width="560" height="150" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.2"/>
+<text x="875" y="912" text-anchor="middle" font-size="13" font-weight="700" fill="#173404">u_fifo_memory</text>
+<text x="875" y="928" text-anchor="middle" font-size="10" fill="#3B6D11">(fifo_memory — dual-port, mem[0:2^ADDR_WIDTH-1])</text>
+<text x="615" y="948" font-size="11" fill="#173404">in:  wr_clk, wr_en=mem_wr_en, wr_addr, wr_data,</text>
+<text x="615" y="963" font-size="11" fill="#173404">     rd_clk, rd_en=mem_rd_en, rd_addr</text>
+<text x="615" y="981" font-size="11" fill="#173404">out: rd_data</text>
+<text x="615" y="1005" font-size="10" fill="#3B6D11">write always@(posedge wr_clk); read always@(posedge rd_clk) — no reset on the array itself</text>
+<text x="615" y="1022" font-size="10" fill="#3B6D11">fifo_enable does not appear here directly — it is folded into mem_wr_en / mem_rd_en above</text>
+
+<!-- ===================== LEGEND ===================== -->
+<rect x="140" y="1060" width="1470" height="80" rx="8" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="1"/>
+<text x="160" y="1080" font-size="11" font-weight="700" fill="#111">Legend</text>
+<rect x="160" y="1090" width="14" height="14" fill="#E1F5EE" stroke="#0F6E56"/><text x="180" y="1101" font-size="10" fill="#111">write-domain block</text>
+<rect x="330" y="1090" width="14" height="14" fill="#FAECE7" stroke="#993C1D"/><text x="350" y="1101" font-size="10" fill="#111">read-domain block</text>
+<rect x="490" y="1090" width="14" height="14" fill="#EEEDFE" stroke="#534AB7"/><text x="510" y="1101" font-size="10" fill="#111">CDC 2-FF synchronizer</text>
+<rect x="680" y="1090" width="14" height="14" fill="#FAEEDA" stroke="#854F0B"/><text x="700" y="1101" font-size="10" fill="#111">combinational AND (assign)</text>
+<rect x="900" y="1090" width="14" height="14" fill="#EAF3DE" stroke="#3B6D11"/><text x="920" y="1101" font-size="10" fill="#111">shared dual-port memory</text>
+<line x1="1080" y1="1097" x2="1110" y2="1097" stroke="#333" stroke-width="1.3" stroke-dasharray="4 3"/><text x="1120" y="1101" font-size="10" fill="#111">net-label wire (same signal name = same net, short local run drawn)</text>
+</svg>
