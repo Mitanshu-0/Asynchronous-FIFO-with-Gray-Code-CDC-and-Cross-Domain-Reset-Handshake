@@ -2,185 +2,56 @@
 
 ⚡ Asynchronous FIFO
 
-Gray-Code CDC · Cross-Domain Reset Handshake · Self-Checking Verification
+Gray-Code CDC & Cross-Domain Reset Handshake
 
 <p>
-  <img src="https://img.shields.io/badge/HDL-Verilog--2001-1e88e5?style=for-the-badge&logo=v&logoColor=white">
-  <img src="https://img.shields.io/badge/Architecture-Async%20FIFO-8e24aa?style=for-the-badge">
-  <img src="https://img.shields.io/badge/CDC-Gray%20Code%20%2B%202FF-fb8c00?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Reset-Cross--Domain%20Handshake-43a047?style=for-the-badge">
+  <img src="https://img.shields.io/badge/HDL-Verilog-1e88e5?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Design-Asynchronous%20FIFO-7b1fa2?style=for-the-badge">
+  <img src="https://img.shields.io/badge/CDC-2--FF%20Synchronizer-f57c00?style=for-the-badge">
   <img src="https://img.shields.io/badge/Verification-367%2F367%20Passed-2e7d32?style=for-the-badge">
+</p>
+
+<p>
+  <b>A parameterized Verilog RTL implementation of an asynchronous FIFO with independent clock domains, Gray-coded pointer synchronization, and coordinated reset initialization.</b>
 </p>
 
 </div>
 
-📑 Table of Contents
-
-Overview
-
-Architecture
-
-Clock Domain Crossing
-
-Full / Empty Detection
-
-Overflow / Underflow
-
-Reset Design
-
-Parameters
-
-Interface
-
-RTL Modules
-
-Verification
-
-Running the Simulation
-
-Project Structure
-
-Design Notes & Known Behavior
-
-Roadmap
-
-📖 Overview
-
-This repository implements an asynchronous (dual-clock) FIFO in Verilog. The write
-side and read side run on independent, unrelated clocks — data, pointers, and reset all
-cross that boundary safely using industry-standard CDC techniques rather than ad-hoc
-synchronization.
-
-What it does, precisely:
-
-Accepts writes on wr_clk and makes them available for reads on rd_clk, with no
-fixed frequency or phase relationship required between the two.
-
-Tracks occupancy using binary pointers, Gray-codes them before crossing domains, and
-re-synchronizes with 2-flop synchronizers so only one bit ever changes per transfer.
-
-Flags full / empty locally in each domain — never combined across domains, since
-no real consumer of this FIFO would ever need to.
-
-Flags overflow / underflow as one-cycle pulses when an already-full write or
-already-empty read is attempted.
-
-Holds both domains at reset until each has locally reset and confirmed the other
-domain has too, via a dedicated handshake block.
-
 🏗️ Architecture
 
-The complete FIFO architecture is shown below.
+The FIFO is divided into two independent clock domains:
+
+Write clock domain
+
+Read clock domain
+
+The complete architecture is shown below.
 
 <p align="center">
-  <img src="docs/async_fifo_full_architecture.svg" alt="Asynchronous FIFO Architecture" width="850">
+  <img src="docs/async_fifo_full_architecture.svg" alt="Asynchronous FIFO Architecture" width="900">
 </p>
 
-<details>
-<summary><b>▸ Data path in one sentence, per direction</b></summary>
+📌 About the Design
 
-Write → memory: wr_data + wr_en, gated by wr_fifo_enable and !full, are
-accepted by write_controller, which increments wr_ptr_bin/wr_ptr_gray and drives
-wr_addr into fifo_memory.
+This project implements an Asynchronous FIFO (First-In, First-Out) using Verilog RTL.
 
-Memory → read: read_controller drives rd_addr into fifo_memory; the
-registered result appears on rd_data one rd_clk cycle later, gated by
-rd_fifo_enable and !empty.
+The write and read sides operate with independent clocks. The FIFO uses binary pointers internally and converts them to Gray code before transferring pointer information across the clock domains.
 
-Pointer crossing: wr_ptr_gray reaches the read domain via cdc_sync as
-wr_ptr_gray_sync (used for empty detection); rd_ptr_gray reaches the write domain
-the same way as rd_ptr_gray_sync (used for full detection).
+A 2-flop synchronizer is used for pointer CDC. Each clock domain also has its own reset synchronizer, and a cross-domain reset handshake coordinates FIFO initialization before normal FIFO operation begins.
 
-</details>
+The design provides:
 
-🔀 Clock Domain Crossing
+Full and empty detection
 
-Binary pointers can't cross clock domains directly — multiple bits changing at once
-means a synchronizer can sample a mix of old and new bits and produce a value that
-never actually existed. The design avoids this in two layers:
+Overflow and underflow indication
 
-flowchart LR
-    A["Binary Pointer<br/>(wr_ptr_bin / rd_ptr_bin)"] --> B["Gray-Code Conversion<br/><sub>only one bit changes per increment</sub>"]
-    B --> C["2-Flop Synchronizer<br/><sub>cdc_sync, resolves metastability</sub>"]
-    C --> D["Opposite Clock Domain<br/><sub>used for full / empty comparison</sub>"]
+Parameterized data width
 
-    style A fill:#1b262c,stroke:#90a4ae,color:#fff
-    style B fill:#2a1a3d,stroke:#8e24aa,color:#fff
-    style C fill:#2a1a3d,stroke:#8e24aa,color:#fff
-    style D fill:#1b262c,stroke:#90a4ae,color:#fff
+Parameterized FIFO depth
 
-The write pointer is Gray-coded and synchronized into the read domain.
+Independent write and read clocks
 
-The read pointer is Gray-coded and synchronized into the write domain.
-
-The pointer width is ADDR_WIDTH + 1 — the extra MSB is what lets full and empty
-be told apart once the pointers wrap around the buffer.
-
-🎯 Full / Empty Detection
-
-Full — checked entirely in the write domain, against the synchronized read
-pointer, with the top two bits inverted to distinguish "wrapped and full" from
-"aligned and empty":
-
-full_compare_ptr = rd_ptr_gray_sync;
-full_compare_ptr[ADDR_WIDTH]   = ~rd_ptr_gray_sync[ADDR_WIDTH];
-full_compare_ptr[ADDR_WIDTH-1] = ~rd_ptr_gray_sync[ADDR_WIDTH-1];
-full_next = (wr_ptr_gray_next == full_compare_ptr);
-
-Empty — checked entirely in the read domain, against the synchronized write
-pointer, with a direct (non-inverted) compare:
-
-empty_next = (rd_ptr_gray_next == wr_ptr_gray_sync);
-
-Because each flag is computed independently in its own domain from a
-synchronizer-delayed view of the other pointer, there's a brief real-world window
-right after a burst where the write domain already knows it's full but the read
-domain hasn't been told yet. That's expected CDC latency, not a race condition — see
-Design Notes.
-
-⚠️ Overflow / Underflow
-
-One-cycle pulses that flag an already-rejected operation — the FIFO state itself is
-never corrupted, since write_accept / read_accept already gate out the actual
-write/read.
-
-// write_controller — asserted when wr_en arrives while already full
-overflow <= wr_en && full;
-
-// read_controller — asserted when rd_en arrives while already empty
-underflow <= rd_en && empty;
-
-🔄 Reset Design
-
-sequenceDiagram
-    participant WRST as reset_sync (wr)
-    participant WHS as reset_handshake (wr)
-    participant RHS as reset_handshake (rd)
-    participant RRST as reset_sync (rd)
-
-    Note over WRST,RRST: wr_rst_n / rd_rst_n asserted (async)
-    WRST->>WHS: wr_local_rst_n released (sync, 2 wr_clk edges)
-    RRST->>RHS: rd_local_rst_n released (sync, 2 rd_clk edges)
-    WHS->>WHS: wr_init_done = 1
-    RHS->>RHS: rd_init_done = 1
-    WHS-->>RHS: wr_init_done (2-flop synced)
-    RHS-->>WHS: rd_init_done (2-flop synced)
-    WHS-->>RHS: wr_ready (2-flop synced)
-    RHS-->>WHS: rd_ready (2-flop synced)
-    Note over WHS: wr_fifo_enable = wr_ready & wr_remote_ready_sync
-    Note over RHS: rd_fifo_enable = rd_ready & rd_remote_ready_sync
-    Note over WHS,RHS: Both domains now unblock their controllers
-
-Each domain gets its own reset_sync: asynchronous assert, synchronous
-de-assert — the standard glitch-free reset release.
-
-Neither write_controller nor read_controller moves a pointer until its own
-*_fifo_enable is high, which requires both local reset to have cleared and
-the opposite domain to have confirmed it did too.
-
-Re-triggering reset on either domain drops both fifo_enable signals, forces
-pointers back to zero, and clears full/empty back to their power-up state.
-The memory array itself is not cleared — see Design Notes.
+Dual-clock FIFO memory
 
 ⚙️ Parameters
 
@@ -194,7 +65,7 @@ DATA_WIDTH
 
 8
 
-Width of each FIFO word
+Width of each FIFO data word
 
 ADDR_WIDTH
 
@@ -204,308 +75,270 @@ Address width
 
 FIFO_DEPTH
 
-2^ADDR_WIDTH = 16
+16
 
-Number of storage locations
+FIFO depth (2^ADDR_WIDTH)
 
 PTR_WIDTH
 
-ADDR_WIDTH + 1 = 5
+5
 
-Pointer width (extra MSB disambiguates wrap)
+Pointer width (ADDR_WIDTH + 1)
+
+Default configuration
+
+Data width   : 8 bits
+FIFO depth   : 16 entries
+Address      : 4 bits
+Pointer      : 5 bits
+
+The additional pointer bit is used to distinguish full and empty conditions when the pointers wrap around.
 
 🔌 Interface
 
-<table>
-<tr><td valign="top">
-
-Write Side
+Write Domain
 
 Signal
 
-Dir
+Direction
 
 Description
 
 wr_clk
 
-in
+Input
 
 Write clock
 
 wr_rst_n
 
-in
+Input
 
-Active-low async write reset
+Active-low write reset
 
 wr_en
 
-in
+Input
 
 Write enable
 
 wr_data
 
-in
+Input
 
-Input data, [DATA_WIDTH-1:0]
+Data to be written
 
 full
 
-out
+Output
 
-FIFO is full
+FIFO full indication
 
 overflow
 
-out
+Output
 
-Write attempted while full
+Write attempted while FIFO was full
 
-</td><td valign="top">
-
-Read Side
+Read Domain
 
 Signal
 
-Dir
+Direction
 
 Description
 
 rd_clk
 
-in
+Input
 
 Read clock
 
 rd_rst_n
 
-in
+Input
 
-Active-low async read reset
+Active-low read reset
 
 rd_en
 
-in
+Input
 
 Read enable
 
 rd_data
 
-out
+Output
 
-Output data, [DATA_WIDTH-1:0]
+Data read from FIFO
 
 empty
 
-out
+Output
 
-FIFO is empty
+FIFO empty indication
 
 underflow
 
-out
+Output
 
-Read attempted while empty
+Read attempted while FIFO was empty
 
-</td></tr>
-</table>
+🔄 How the FIFO Works
+
+Write path
+
+A write is accepted when:
+
+wr_en && !full && wr_fifo_enable
+
+When accepted, data is written into the FIFO memory and the write pointer advances.
+
+The write pointer is maintained in binary and Gray-code form. The Gray-coded pointer is then synchronized into the read clock domain.
+
+Read path
+
+A read is accepted when:
+
+rd_en && !empty && rd_fifo_enable
+
+When accepted, data is read from the FIFO memory and the read pointer advances.
+
+The Gray-coded read pointer is synchronized into the write clock domain.
+
+🔀 Clock Domain Crossing
+
+The two clocks are asynchronous, so the pointer values are not transferred directly as binary counters.
+
+The pointer transfer follows:
+
+Binary Pointer
+      ↓
+Gray Code
+      ↓
+2-FF Synchronizer
+      ↓
+Destination Clock Domain
+
+Write pointer → Read domain
+
+wr_ptr_bin → wr_ptr_gray → 2-FF synchronizer → wr_ptr_gray_sync
+
+Read pointer → Write domain
+
+rd_ptr_bin → rd_ptr_gray → 2-FF synchronizer → rd_ptr_gray_sync
+
+Gray code is used so that consecutive pointer values differ by one bit during normal pointer movement.
+
+🚦 Full & Empty Detection
+
+Full
+
+The write controller compares the next write Gray pointer with the synchronized read pointer after inverting the two most significant bits.
+
+full_compare_ptr = rd_ptr_gray_sync;
+
+full_compare_ptr[ADDR_WIDTH] =
+    ~rd_ptr_gray_sync[ADDR_WIDTH];
+
+full_compare_ptr[ADDR_WIDTH-1] =
+    ~rd_ptr_gray_sync[ADDR_WIDTH-1];
+
+full_next =
+    (wr_ptr_gray_next == full_compare_ptr);
+
+Empty
+
+The read controller compares the next read Gray pointer with the synchronized write pointer.
+
+empty_next =
+    (rd_ptr_gray_next == wr_ptr_gray_sync);
+
+⚠️ Overflow & Underflow
+
+Overflow
+
+An overflow pulse is generated when a write is requested while the FIFO is full:
+
+overflow <= wr_en && full;
+
+The write is not accepted.
+
+Underflow
+
+An underflow pulse is generated when a read is requested while the FIFO is empty:
+
+underflow <= rd_en && empty;
+
+The read is not accepted.
+
+🔐 Reset & Initialization
+
+Each clock domain has its own reset synchronizer implementing:
+
+Asynchronous reset assertion
+
+Synchronous reset de-assertion
+
+After the local reset is synchronized, the two domains exchange initialization and ready information through the reset handshake.
+
+FIFO operation is enabled only after the required local and remote initialization conditions are satisfied.
+
+During reset/reinitialization:
+
+Write pointer returns to its initial value
+
+Read pointer returns to its initial value
+
+full is cleared
+
+empty is asserted
+
+FIFO operation is disabled
+
+The FIFO memory itself is not reset. Therefore, previously stored memory contents are not considered valid FIFO data after reinitialization.
 
 🧩 RTL Modules
 
-<details open>
-<summary><b>▸ Module breakdown</b></summary>
+The current implementation keeps the complete design in one Verilog source file.
 
 Module
 
-Role
+Purpose
 
 async_fifo
 
-Top level — instantiates and wires everything below
+Top-level FIFO and module interconnection
 
 reset_sync
 
-Async-assert / sync-deassert reset synchronizer (one per domain)
+Reset synchronization for each clock domain
 
 reset_handshake
 
-Cross-domain init_done / ready exchange, generates *_fifo_enable
+Cross-domain initialization handshake
 
 cdc_sync
 
-2-flop synchronizer for Gray-coded pointers
+2-flop synchronization of Gray-coded pointers
 
 fifo_memory
 
-Dual-port storage array, no internal reset — qualified externally
+Dual-clock FIFO storage
 
 write_controller
 
-Write pointer, address generation, full, overflow
+Write pointer, full and overflow logic
 
 read_controller
 
-Read pointer, address generation, empty, underflow
+Read pointer, empty and underflow logic
 
-All modules currently live in a single Verilog source file (see
-Project Structure).
+🧪 Verification
 
-</details>
+The FIFO was verified using directed checks and data-integrity checking.
 
-✅ Verification
-
-The design is verified with a self-checking SystemVerilog testbench: a
-race-free shadow-register event checker for overflow/underflow, a queue-based
-data scoreboard that only models writes the DUT actually accepted, and two
-genuinely unrelated clock periods (wr_clk = 10 ns, rd_clk = 16 ns) to stress
-the CDC paths for real.
-
-<details open>
-<summary><b>▸ Test list (18 tests)</b></summary>
-
-#
-
-Test
-
-Focus
-
-1
-
-Simultaneous reset / initialization
-
-Both domains reset together, handshake completes
-
-2
-
-Single write / single read
-
-Basic data integrity
-
-3
-
-Fill FIFO to full, reader stopped
-
-full timing
-
-4
-
-DEPTH+1 write / overflow
-
-Overflow pulses exactly once
-
-5
-
-Drain FIFO / empty
-
-empty timing
-
-6
-
-DEPTH+1 read / underflow
-
-Underflow pulses exactly once
-
-7
-
-Normal burst, reader stopped
-
-Mid-occupancy behavior
-
-8
-
-Pointer wraparound
-
-3 full laps around the buffer
-
-9
-
-Writer faster / reader stopped
-
-Sustained overflow rejection
-
-10
-
-Reader faster / writer stopped
-
-Sustained underflow rejection
-
-11
-
-Independent write-domain reset at half-full
-
-Cross-domain enable drop/recovery
-
-12
-
-Independent read-domain reset at half-full
-
-Cross-domain enable drop/recovery
-
-13
-
-Reset while FIFO is full
-
-Full state clears correctly
-
-14
-
-Reset while enables are active
-
-No corruption mid-transaction
-
-15
-
-Skewed reset release
-
-Wildly staggered wr_rst_n / rd_rst_n timing
-
-16
-
-Reset with data in flight
-
-Reset during an active read burst
-
-17
-
-Concurrent random stress
-
-600 cycles/domain, randomized wr_en/rd_en
-
-18
-
-Overflow/underflow event summary
-
-Zero mismatches vs. shadow model
-
-</details>
-
-<details>
-<summary><b>▸ Why the event checker is "race-free"</b></summary>
-
-A naive always @(posedge clk) if (overflow) counter++ monitor can race the DUT's
-own same-edge nonblocking update and silently miss or double-count a single-cycle
-pulse. This testbench instead mirrors the DUT's exact always-block priority (async
-reset > !fifo_enable hold > normal update) in a single-driver shadow register, and
-compares against the DUT on the opposite clock edge — eliminating the race
-entirely rather than working around it with delays.
-
-</details>
-
-🚀 Running the Simulation
-
-Icarus Verilog:
-
-iverilog -g2012 -o sim tb/tb_async_fifo.sv rtl/async_fifo.v
-vvp sim
-
-ModelSim / Questa:
-
-vlog -sv tb/tb_async_fifo.sv rtl/async_fifo.v
-vsim -c tb_async_fifo -do "run -all; quit"
-
-Final simulation result:
+Final simulation result
 
 # ================================================
 # FINAL RESULTS
@@ -519,72 +352,64 @@ Final simulation result:
 # RESULT: ALL CHECKS PASSED (367/367)
 # ================================================
 
-Expected tail of the log:
+Result Summary
 
-================================================
-FINAL RESULTS
-================================================
-Directed checks : 60 passed / 0 failed / 60 total
-Data integrity  : XXXX passed / 0 failed / XXXX total
-Overflow event mismatches : 0
-Underflow event mismatches: 0
-RESULT: ALL CHECKS PASSED (.../...)
-================================================
+Check
 
-📁 Project Structure
+Result
+
+Directed checks
+
+80 / 80 passed
+
+Data integrity
+
+287 / 287 passed
+
+Overflow event mismatches
+
+0
+
+Underflow event mismatches
+
+0
+
+Total checks
+
+367 / 367 passed
+
+Verification result: ALL CHECKS PASSED ✅
+
+📁 Repository Structure
 
 Async-FIFO/
 │
 ├── README.md
 │
 ├── rtl/
-│   └── async_fifo.v          # async_fifo, reset_sync, reset_handshake,
-│                              # cdc_sync, fifo_memory, write_controller,
-│                              # read_controller
-│
-├── tb/
-│   └── tb_async_fifo.sv      # Self-checking testbench (18 tests)
+│   └── async_fifo.v
 │
 └── docs/
     └── async_fifo_full_architecture.svg
 
-All RTL modules currently live in one file; splitting into individual files is
-tracked in Roadmap.
+The current version keeps all RTL modules in a single source file. The modules can be separated into individual files later for easier maintenance and reuse.
 
-🔍 Design Notes & Known Behavior
+🛠️ Tools
 
-Memory is not cleared on reset. Reset re-initializes pointers and control state
-only. After any reset/reinitialization, treat prior memory contents as invalid —
-don't rely on stale data surviving a reset.
+Verilog HDL
 
-full and empty are domain-local by design. Each is computed from a
-synchronizer-delayed view of the other pointer, so comparing them together across
-clock domains (e.g., in a testbench monitor) can show both true at once right after a
-burst fills the FIFO. No real consumer samples both flags combinationally like that —
-each is only ever used synchronously within its own domain — so this is expected CDC
-behavior, not a functional bug.
+RTL Simulation
 
-fifo_enable adds latency after reset. The two-way init_done/ready exchange
-costs a handful of clock edges (2-flop sync, each direction) before either controller
-starts moving pointers. This is intentional and keeps both domains from touching
-shared state before the other side is provably out of reset.
+GitHub
 
-Minimum depth: the full-detection MSB-inversion trick requires ADDR_WIDTH >= 1
-(depth ≥ 2); it has been verified functionally correct down to that minimum.
+🎯 Project Focus
 
-🗺️ Roadmap
+The main focus of this project is implementing and verifying an asynchronous FIFO while handling the important issues that come with independent clock domains:
 
-Split RTL into one module per file
-
-Add a lint-clean pass (Verilator --lint-only)
-
-Parameterize FWFT (first-word-fall-through) as an option
-
-Add a synthesis-oriented top-level wrapper with configurable almost-full/almost-empty thresholds
+Gray-code pointer transfer → CDC synchronization → Full/empty detection → Overflow/underflow handling → Reset synchronization → Cross-domain initialization
 
 <div align="center">
 
-Built around Gray-code CDC and a handshake-gated reset — the two ideas that make an
-async FIFO actually safe to put on silicon.
+⚡ Asynchronous FIFO • Verilog RTL • CDC • Gray Code
 
 </div>
