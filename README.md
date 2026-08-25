@@ -1,31 +1,85 @@
-Asynchronous FIFO
+# Asynchronous FIFO
 
-A parameterized Asynchronous FIFO (First-In-First-Out) implemented
-in Verilog/SystemVerilog for transferring data between two independent
-clock domains.
+A parameterized **Asynchronous FIFO (First-In-First-Out)** implemented
+in Verilog/SystemVerilog for reliable data transfer between two
+independent clock domains.
 
-The project includes:
+The design uses **Gray-coded read/write pointers**, **2-flop CDC
+synchronizers**, independent reset synchronization, and a cross-domain
+reset handshake. A self-checking testbench verifies functional behavior,
+data integrity, reset corner cases, and overflow/underflow events.
 
-Gray-coded read/write pointers
+------------------------------------------------------------------------
 
-2-flop clock-domain-crossing synchronizers
+## Table of Contents
 
-Independent reset synchronization
+-   [Overview](#overview)
+-   [Features](#features)
+-   [Project Structure](#project-structure)
+-   [Architecture](#architecture)
+-   [FIFO Configuration](#fifo-configuration)
+-   [RTL Modules](#rtl-modules)
+-   [Clock-Domain Crossing](#clock-domain-crossing)
+-   [FIFO Operation](#fifo-operation)
+-   [Full and Empty Detection](#full-and-empty-detection)
+-   [Reset Handling](#reset-handling)
+-   [Overflow and Underflow](#overflow-and-underflow)
+-   [Verification](#verification)
+-   [Verification Tests](#verification-tests)
+-   [Random Stress Test](#random-stress-test)
+-   [Verification Results](#verification-results)
+-   [Design Highlights](#design-highlights)
+-   [Future Improvements](#future-improvements)
+-   [Project Status](#project-status)
 
-Cross-domain reset handshake
+------------------------------------------------------------------------
 
-Full and empty detection
+## Overview
 
-Overflow and underflow indication
+An asynchronous FIFO is used when data must be transferred between two
+clock domains that operate independently.
 
-Dual-clock FIFO memory
+This project implements a dual-clock FIFO with:
 
-Self-checking verification testbench
+-   An independent **write clock domain**
+-   An independent **read clock domain**
+-   Local binary pointers for address generation
+-   Gray-coded pointers for clock-domain crossing
+-   2-stage synchronizers for transferred pointers
+-   Full and empty status generation
+-   Overflow and underflow event indication
+-   Coordinated reset startup
+-   A self-checking verification environment
 
-Directed, corner-case, and randomized stress testing
+The default implementation is an **8-bit × 16-entry FIFO**.
 
-Project Structure
+------------------------------------------------------------------------
 
+## Features
+
+  Feature                 Implementation
+  ----------------------- ---------------------------------------
+  FIFO type               Asynchronous / dual-clock
+  Data width              8 bits
+  FIFO depth              16 entries
+  Write clock             `wr_clk`
+  Read clock              `rd_clk`
+  Pointer format          Binary + Gray
+  CDC synchronization     2-flop synchronizers
+  Full detection          Gray-code next-pointer comparison
+  Empty detection         Gray-code next-pointer comparison
+  Overflow                Registered event
+  Underflow               Registered event
+  Reset                   Async assertion / sync de-assertion
+  Reset coordination      Cross-domain handshake
+  Verification            Self-checking SystemVerilog testbench
+  Final verified checks   **367 / 367 passed**
+
+------------------------------------------------------------------------
+
+## Project Structure
+
+``` text
 .
 ├── docs/
 │   └── async_fifo_full_architecture.svg
@@ -40,340 +94,522 @@ Project Structure
 │   └── write_controller.v
 │
 └── tb/
-    └── tb_async_fifo
+    └── tb_async_fifo.sv
+```
 
-The testbench filename can be kept with the extension used in the
-repository.
+### Directory Description
 
-Architecture
+  Directory   Purpose
+  ----------- --------------------------------------
+  `rtl/`      RTL design modules
+  `tb/`       Self-checking verification testbench
+  `docs/`     Project architecture documentation
 
+------------------------------------------------------------------------
 
+## Architecture
 
-The design has two independent clock domains:
+The project architecture is documented in the repository SVG:
 
-Write domain: wr_clk
+![Asynchronous FIFO Architecture](docs/async_fifo_full_architecture.svg)
 
-Read domain: rd_clk
+The FIFO is divided into two independent clock domains.
 
-The write and read pointers are maintained locally and transferred to
-the opposite clock domain using Gray coding and 2-flop synchronizers.
+### Write Domain
 
-Main data flow
+The write side contains:
 
-                    +----------------------+
-                    |     async_fifo       |
-                    |      top level       |
-                    +----------+-----------+
-                               |
-              +----------------+----------------+
-              |                                 |
-              v                                 v
-     +------------------+              +------------------+
-     | Write Controller |              | Read Controller  |
-     +--------+---------+              +--------+---------+
-              |                                 |
-        Write Pointer                      Read Pointer
-        Binary + Gray                      Binary + Gray
-              |                                 |
-              |       2-FF CDC Synchronizers    |
-              +--------------+------------------+
-                             |
-                             v
-                    +----------------+
-                    |  FIFO Memory   |
-                    +----------------+
+-   Write controller
+-   Binary write pointer
+-   Gray-coded write pointer
+-   Write address generation
+-   Full detection
+-   Overflow generation
 
-FIFO Configuration
+### Read Domain
 
-The default parameters are:
+The read side contains:
 
-Parameter                   Value
+-   Read controller
+-   Binary read pointer
+-   Gray-coded read pointer
+-   Read address generation
+-   Empty detection
+-   Underflow generation
 
-Data width                 8 bits
-Address width              4 bits
-FIFO depth             16 entries
-Pointer width              5 bits
-Write clock period          10 ns
-Read clock period           16 ns
+### Cross-Domain Paths
 
-The FIFO depth is calculated as:
+Two pointer paths cross the clock-domain boundary:
 
-DEPTH = 2^ADDR_WIDTH
-      = 2^4
-      = 16
+``` text
+Read Gray Pointer
+       │
+       ▼
+2-FF Synchronizer
+       │
+       ▼
+Write Clock Domain
+```
 
-The pointer width is one bit wider than the address width:
+``` text
+Write Gray Pointer
+       │
+       ▼
+2-FF Synchronizer
+       │
+       ▼
+Read Clock Domain
+```
 
-PTR_WIDTH = ADDR_WIDTH + 1
-           = 5 bits
+The FIFO memory is shared between the two domains through independent
+write and read clocked accesses.
 
-The additional pointer bit is used to distinguish the full and empty
-conditions after pointer wraparound.
+------------------------------------------------------------------------
 
-RTL Modules
+## FIFO Configuration
 
-async_fifo.v
+The top-level module is parameterized using:
 
-Top-level FIFO module.
+``` verilog
+parameter DATA_WIDTH = 8
+parameter ADDR_WIDTH = 4
+```
 
-It connects the reset logic, reset handshake, write controller, read
-controller, CDC synchronizers, and FIFO memory.
+Therefore:
 
-reset_sync.v
+``` text
+FIFO depth
+= 2^ADDR_WIDTH
+= 2^4
+= 16 entries
+```
+
+The pointer width is:
+
+``` text
+PTR_WIDTH
+= ADDR_WIDTH + 1
+= 5 bits
+```
+
+The additional pointer bit allows the design to distinguish between full
+and empty states after pointer wraparound.
+
+### Default Parameters
+
+  Parameter         Value
+  --------------- -------
+  `DATA_WIDTH`          8
+  `ADDR_WIDTH`          4
+  FIFO depth           16
+  Pointer width         5
+
+------------------------------------------------------------------------
+
+## RTL Modules
+
+### `async_fifo.v`
+
+Top-level integration module.
+
+It connects:
+
+-   Reset synchronization
+-   Reset handshake
+-   Write controller
+-   Read controller
+-   Pointer CDC synchronizers
+-   FIFO memory
+
+### `reset_sync.v`
 
 Provides asynchronous reset assertion and synchronous reset de-assertion
-for each clock domain.
+for an individual clock domain.
 
-reset_handshake.v
+### `reset_handshake.v`
 
 Coordinates initialization between the write and read domains.
 
-Each side waits for the other domain to complete initialization before
-normal FIFO operation begins.
+Normal FIFO operation begins only after the required local and remote
+initialization conditions are satisfied.
 
-cdc_sync.v
+### `cdc_sync.v`
 
-A 2-flop synchronizer used to transfer Gray-coded FIFO pointers between
-asynchronous clock domains.
+Implements the 2-flop synchronizer used to transfer Gray-coded pointers
+between asynchronous clock domains.
 
-There are two CDC paths:
+Two instances are used:
 
-Read pointer  → Write clock domain
-Write pointer → Read clock domain
+``` text
+Read pointer  → Write domain
+Write pointer → Read domain
+```
 
-fifo_memory.v
+### `fifo_memory.v`
 
-Implements the FIFO storage.
+Implements the FIFO storage array.
 
-Writes occur on wr_clk
+-   Write access uses `wr_clk`
+-   Read access uses `rd_clk`
+-   Memory accesses are enabled only for accepted FIFO operations
 
-Reads occur on rd_clk
+### `write_controller.v`
 
-Write and read accesses are qualified by the FIFO control logic
+Controls the write side of the FIFO.
 
-write_controller.v
+Responsibilities:
 
-Handles the write side:
+-   Write pointer generation
+-   Binary-to-Gray conversion
+-   Write address generation
+-   Full detection
+-   Overflow generation
 
-Write pointer generation
+A write is accepted when:
 
-Binary-to-Gray conversion
-
-Full detection
-
-Overflow generation
-
-Write address generation
-
-A write is accepted only when:
-
+``` text
 wr_en = 1
 full = 0
 fifo_enable = 1
+```
 
-read_controller.v
+### `read_controller.v`
 
-Handles the read side:
+Controls the read side of the FIFO.
 
-Read pointer generation
+Responsibilities:
 
-Binary-to-Gray conversion
+-   Read pointer generation
+-   Binary-to-Gray conversion
+-   Read address generation
+-   Empty detection
+-   Underflow generation
 
-Empty detection
+A read is accepted when:
 
-Underflow generation
-
-Read address generation
-
-A read is accepted only when:
-
+``` text
 rd_en = 1
 empty = 0
 fifo_enable = 1
+```
 
-Clock Domain Crossing
+------------------------------------------------------------------------
 
-The FIFO does not directly pass binary pointers between clock domains.
+## Clock-Domain Crossing
 
-Instead:
+The FIFO does not directly transfer binary pointers between clock
+domains.
 
+Instead, each pointer follows this path:
+
+``` text
 Binary Pointer
-      |
-      v
-Gray Code
-      |
-      v
+      │
+      ▼
+Gray Conversion
+      │
+      ▼
 2-FF Synchronizer
-      |
-      v
-Other Clock Domain
+      │
+      ▼
+Destination Clock Domain
+```
 
-Gray code is used because only one bit changes between consecutive
-Gray-code values. This reduces the risk of an asynchronous receiver
-observing multiple pointer bits changing at the same time.
+### Why Gray Code?
 
-The synchronized pointers are then used for full and empty generation.
+A binary counter can change several bits during a single increment. Gray
+code changes only one bit between adjacent values, making it better
+suited for asynchronous pointer transfer.
 
-Full Detection
+The synchronized Gray pointer is then used by the destination-domain
+FIFO controller for full or empty detection.
 
-The write controller calculates the next write pointer.
+------------------------------------------------------------------------
 
-The FIFO becomes full when the next Gray-coded write pointer matches the
-synchronized read pointer with the required wrap bits inverted.
+## FIFO Operation
+
+### Write Operation
+
+A write request is accepted only when the FIFO is enabled and not full.
+
+``` text
+wr_en
+  │
+  ▼
+FIFO enabled?
+  │
+  ├── No ──► Reject
+  │
+  ▼
+full?
+  │
+  ├── Yes ─► Reject + overflow event
+  │
+  ▼
+Write data to memory
+  │
+  ▼
+Increment write pointer
+  │
+  ▼
+Convert binary pointer to Gray code
+  │
+  ▼
+Update full status
+```
+
+### Read Operation
+
+A read request is accepted only when the FIFO is enabled and not empty.
+
+``` text
+rd_en
+  │
+  ▼
+FIFO enabled?
+  │
+  ├── No ──► Reject
+  │
+  ▼
+empty?
+  │
+  ├── Yes ─► Reject + underflow event
+  │
+  ▼
+Read data from memory
+  │
+  ▼
+Increment read pointer
+  │
+  ▼
+Convert binary pointer to Gray code
+  │
+  ▼
+Update empty status
+```
+
+------------------------------------------------------------------------
+
+## Full and Empty Detection
+
+### Full Detection
+
+The write controller calculates the next write pointer and compares its
+Gray-coded value with the synchronized read pointer.
+
+The required wraparound bits are inverted for the full comparison.
 
 Conceptually:
 
-next write pointer
-        |
-        v
-   Gray conversion
-        |
-        v
-compare with synchronized
-read pointer
-        |
-        v
-      FULL
+``` text
+Next Write Pointer
+        │
+        ▼
+   Gray Conversion
+        │
+        ▼
+Compare with synchronized
+Read Gray Pointer
+        │
+        ▼
+       FULL
+```
 
-When full is asserted, further write requests are rejected.
+When `full` is asserted, additional write requests are rejected.
 
-Empty Detection
+### Empty Detection
 
 The read controller calculates the next read pointer.
 
-The FIFO becomes empty when:
+The FIFO is empty when:
 
+``` text
 next_read_gray == synchronized_write_gray
+```
 
-When empty is asserted, further read requests are rejected.
+When `empty` is asserted, additional read requests are rejected.
 
-Overflow and Underflow
+------------------------------------------------------------------------
 
-Overflow
-
-An overflow event occurs when a write is requested while the FIFO is
-full:
-
-wr_en && full
-
-The rejected write does not advance the write pointer or write new data
-into the FIFO.
-
-Underflow
-
-An underflow event occurs when a read is requested while the FIFO is
-empty:
-
-rd_en && empty
-
-The rejected read does not advance the read pointer.
-
-Reset Handling
+## Reset Handling
 
 Each clock domain has its own reset synchronization.
 
 The reset sequence is:
 
+``` text
 External Reset
-      |
-      v
+      │
+      ▼
 Reset Synchronizer
-      |
-      v
+      │
+      ▼
 Local Initialization
-      |
-      v
-Cross-Domain Handshake
-      |
-      v
+      │
+      ▼
+Cross-Domain Reset Handshake
+      │
+      ▼
 FIFO Enabled
+```
 
-The design supports:
+The verification environment exercises:
 
-simultaneous reset
+-   Simultaneous reset
+-   Independent write-side reset
+-   Independent read-side reset
+-   Skewed reset release
+-   Reset while FIFO is full
+-   Reset while enables are active
+-   Reset with data in flight
 
-independent write-side reset
+A reset reinitializes the FIFO pointer and status state, so the FIFO is
+logically flushed after recovery.
 
-independent read-side reset
+------------------------------------------------------------------------
 
-skewed reset release
+## Overflow and Underflow
 
-reset while FIFO is full
+### Overflow
 
-reset during active traffic
+An overflow event occurs when a write is requested while the FIFO is
+full:
 
-reset while data is in flight
+``` text
+wr_en && full
+```
 
-A reset reinitializes the FIFO pointers and status so the FIFO is
-logically flushed.
+The rejected write does not advance the write pointer or enter the FIFO
+memory.
 
-Verification
+### Underflow
+
+An underflow event occurs when a read is requested while the FIFO is
+empty:
+
+``` text
+rd_en && empty
+```
+
+The rejected read does not advance the read pointer.
+
+------------------------------------------------------------------------
+
+# Verification
 
 The testbench is self-checking and uses a queue-based reference model to
-verify FIFO data ordering.
+verify FIFO ordering and data integrity.
 
 The scoreboard:
 
-Adds a value only when the DUT actually accepts a write.
+1.  Tracks only writes accepted by the DUT.
+2.  Stores accepted write data in a reference queue.
+3.  Removes the oldest expected value when a read is accepted.
+4.  Compares the expected value with the registered `rd_data`.
+5.  Reports mismatches automatically.
 
-Removes the oldest expected value when the DUT accepts a read.
-
-Compares the DUT's registered rd_data with the expected value.
-
-Reports any data mismatch automatically.
-
-The testbench also contains independent shadow models for overflow and
+The testbench also maintains independent shadow models for overflow and
 underflow event verification.
 
-Verification Tests
+------------------------------------------------------------------------
 
-The testbench contains 18 major test sections.
+## Verification Tests
 
-Test Description
+The testbench contains **18 major test sections**.
 
-   1 Simultaneous reset / initialization
-   2 Single write / single read
-   3 Fill FIFO to full
-   4 DEPTH+1 write / overflow
-   5 Drain FIFO / empty
-   6 DEPTH+1 read / underflow
-   7 Normal burst
-   8 Pointer wraparound
-   9 Writer faster / reader stopped
-  10 Reader faster / writer stopped
-  11 Independent write reset at half-full
-  12 Independent read reset at half-full
-  13 Reset while FIFO is full
-  14 Reset while enables are active
-  15 Skewed reset release
-  16 Reset with data in flight
-  17 Concurrent random stress
-  18 Overflow/underflow event summary
+  ------------------------------------------------------------------------
+                            \# Test                  Verification Purpose
+  ---------------------------- --------------------- ---------------------
+                             1 Simultaneous reset /  Verify initial FIFO
+                               initialization        state
 
-Random Stress Test
+                             2 Single write / single Verify basic
+                               read                  operation
 
-The testbench includes concurrent randomized traffic.
+                             3 Fill FIFO to full     Verify FIFO capacity
+                                                     and `full`
 
-The write-side stress process runs for:
+                             4 DEPTH+1 write /       Verify rejected write
+                               overflow              and overflow
 
+                             5 Drain FIFO / empty    Verify complete FIFO
+                                                     drain
+
+                             6 DEPTH+1 read /        Verify rejected read
+                               underflow             and underflow
+
+                             7 Normal burst          Verify burst data
+                                                     integrity
+
+                             8 Pointer wraparound    Verify repeated
+                                                     pointer wrapping
+
+                             9 Writer faster /       Verify full behavior
+                               reader stopped        under write pressure
+
+                            10 Reader faster /       Verify empty behavior
+                               writer stopped        under read pressure
+
+                            11 Independent write     Verify write-side
+                               reset at half-full    reset recovery
+
+                            12 Independent read      Verify read-side
+                               reset at half-full    reset recovery
+
+                            13 Reset while FIFO is   Verify full-state
+                               full                  recovery
+
+                            14 Reset while enables   Verify reset during
+                               are active            active traffic
+
+                            15 Skewed reset release  Verify
+                                                     non-simultaneous
+                                                     reset release
+
+                            16 Reset with data in    Verify mid-operation
+                               flight                reset
+
+                            17 Concurrent random     Verify asynchronous
+                               stress                random traffic
+
+                            18 Overflow/underflow    Verify event outputs
+                               event summary         against shadow models
+  ------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## Random Stress Test
+
+The testbench includes concurrent randomized traffic in both clock
+domains.
+
+### Write-side stress
+
+``` text
 600 iterations
+```
 
-The read-side stress process also runs for:
+### Read-side stress
 
+``` text
 600 iterations
+```
 
 The two processes operate independently on their respective clocks.
 
-After the random phase, the scoreboard is completely drained and the
-remaining data is checked.
+After the random phase, the remaining reference-model data is drained
+and the final data-integrity checks are performed.
 
-Verification Result
+------------------------------------------------------------------------
+
+## Verification Results
 
 The current verified simulation produced:
 
-===============================================
+``` text
+================================================
 FINAL RESULTS
-===============================================
+================================================
 Directed checks : 80 passed / 0 failed / 80 total
 Data integrity  : 287 passed / 0 failed / 287 total
 Overflow pulses : 111
@@ -381,95 +617,113 @@ Underflow pulses: 104
 Overflow event mismatches : 0
 Underflow event mismatches: 0
 RESULT: ALL CHECKS PASSED (367/367)
-===============================================
+================================================
+```
 
-Summary
+### Result Summary
 
-Category                                     Result
+  Verification Category      Passed   Failed     Total
+  ----------------------- --------- -------- ---------
+  Directed checks            **80**        0        80
+  Data integrity            **287**        0       287
+  **Combined checks**       **367**    **0**   **367**
 
-Directed checks                  80 / 80 passed
-Data integrity checks          287 / 287 passed
-Total checks                   367 / 367 passed
-Data mismatches                               0
-Overflow event mismatches                     0
-Underflow event mismatches                    0
-Overflow pulses observed                    111
-Underflow pulses observed                   104
+### Event Verification
 
-Result
+  Event         Observed   Mismatches
+  ----------- ---------- ------------
+  Overflow           111        **0**
+  Underflow          104        **0**
 
-ALL CHECKS PASSED --- 367/367
+### Final Result
 
-The implemented verification suite completed without directed-test
-failures, data-integrity failures, or overflow/underflow event
-mismatches.
+> **ALL CHECKS PASSED --- 367/367**
 
-Design Highlights
+The implemented verification suite completed with:
 
-This project demonstrates several important RTL and digital-design
-concepts:
+-   **0 directed-test failures**
+-   **0 data-integrity failures**
+-   **0 overflow event mismatches**
+-   **0 underflow event mismatches**
 
-Asynchronous FIFO design
+------------------------------------------------------------------------
 
-Multiple independent clock domains
+## Design Highlights
 
-Clock-domain crossing
+This project demonstrates the following RTL and digital-design concepts:
 
-Gray-code pointer synchronization
+-   Asynchronous FIFO architecture
+-   Independent clock domains
+-   Clock-domain crossing
+-   Gray-code pointer synchronization
+-   2-flop synchronizers
+-   Full and empty detection
+-   Overflow and underflow handling
+-   Asynchronous reset assertion
+-   Synchronous reset de-assertion
+-   Cross-domain reset coordination
+-   Dual-clock FIFO memory
+-   Queue-based self-checking verification
+-   Directed corner-case verification
+-   Concurrent randomized stress testing
 
-2-flop synchronizers
+------------------------------------------------------------------------
 
-FIFO full/empty detection
+## Future Improvements
 
-Overflow and underflow handling
+Possible extensions to the current implementation include:
 
-Reset synchronization
+-   SystemVerilog assertions
+-   Functional coverage
+-   Additional randomized clock ratios
+-   Constrained-random verification
+-   Dedicated CDC analysis
+-   RTL synthesis
+-   FPGA implementation
+-   Timing and resource analysis
+-   Post-synthesis simulation
+-   Formal verification of FIFO properties
 
-Cross-domain reset coordination
+------------------------------------------------------------------------
 
-Dual-clock memory access
+## Project Status
 
-Queue-based self-checking verification
+  Area                          Status
+  ----------------------------- ----------------------
+  RTL implementation            **Complete**
+  CDC pointer synchronization   **Implemented**
+  Reset coordination            **Implemented**
+  Full / empty detection        **Implemented**
+  Overflow / underflow          **Implemented**
+  Directed verification         **80 / 80 passed**
+  Data-integrity verification   **287 / 287 passed**
+  Total verification checks     **367 / 367 passed**
+  Event mismatches              **0**
+  Overall status                **PASS**
 
-Directed corner-case testing
+------------------------------------------------------------------------
 
-Randomized concurrent stress testing
+## Summary
 
-Future Improvements
+This project implements a parameterized **8-bit × 16-entry asynchronous
+FIFO** designed for data transfer between independent clock domains.
 
-Possible extensions to the current project include:
+The design combines:
 
-SystemVerilog assertions
+``` text
+Binary Pointers
+      ↓
+Gray-Code Conversion
+      ↓
+2-FF CDC Synchronization
+      ↓
+Full / Empty Detection
+      ↓
+FIFO Memory Control
+```
 
-Functional coverage
+The verification environment covers normal operation, boundary
+conditions, pointer wraparound, reset scenarios, overflow/underflow
+behavior, and concurrent randomized traffic.
 
-Additional randomized clock ratios
-
-Additional constrained-random testing
-
-CDC analysis
-
-RTL synthesis
-
-FPGA implementation
-
-Timing and resource reports
-
-Post-synthesis simulation
-
-Formal verification of FIFO properties
-
-Project Status
-
-RTL: Complete
-
-Verification: Complete for the implemented test suite
-
-Final simulation result: 367 / 367 checks passed
-
-Data integrity: 287 / 287 passed
-
-Directed checks: 80 / 80 passed
-
-Overflow/underflow event mismatches: 0
-
+**Final verified result: 367 / 367 checks passed.**
