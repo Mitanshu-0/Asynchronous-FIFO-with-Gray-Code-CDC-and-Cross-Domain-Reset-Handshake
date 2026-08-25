@@ -4,16 +4,13 @@
 
 Gray-Code CDC · Cross-Domain Reset Handshake · Self-Checking Verification
 
-A dual-clock FIFO built around Gray-coded pointers, 2-flop synchronizers, and a
-handshake-gated reset scheme — verified with an 18-test, scoreboard-based testbench.
-
-<img src="https://img.shields.io/badge/HDL-Verilog--2001-1e88e5?style=for-the-badge&logo=v&logoColor=white">
-<img src="https://img.shields.io/badge/Architecture-Async%20FIFO-8e24aa?style=for-the-badge">
-<img src="https://img.shields.io/badge/CDC-Gray%20Code%20%2B%202FF-fb8c00?style=for-the-badge">
-<img src="https://img.shields.io/badge/Reset-Cross--Domain%20Handshake-43a047?style=for-the-badge">
-<br>
-<img src="https://img.shields.io/badge/Testbench-SystemVerilog-c62828?style=for-the-badge">
-<img src="https://img.shields.io/badge/Verification-367%2F367%20Passed-2e7d32?style=for-the-badge">
+<p>
+  <img src="https://img.shields.io/badge/HDL-Verilog--2001-1e88e5?style=for-the-badge&logo=v&logoColor=white">
+  <img src="https://img.shields.io/badge/Architecture-Async%20FIFO-8e24aa?style=for-the-badge">
+  <img src="https://img.shields.io/badge/CDC-Gray%20Code%20%2B%202FF-fb8c00?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Reset-Cross--Domain%20Handshake-43a047?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Verification-367%2F367%20Passed-2e7d32?style=for-the-badge">
+</p>
 
 </div>
 
@@ -507,6 +504,20 @@ ModelSim / Questa:
 
 vlog -sv tb/tb_async_fifo.sv rtl/async_fifo.v
 vsim -c tb_async_fifo -do "run -all; quit"
+
+Final simulation result:
+
+# ================================================
+# FINAL RESULTS
+# ================================================
+# Directed checks : 80 passed / 0 failed / 80 total
+# Data integrity  : 287 passed / 0 failed / 287 total
+# Overflow pulses : 111
+# Underflow pulses: 104
+# Overflow event mismatches : 0
+# Underflow event mismatches: 0
+# RESULT: ALL CHECKS PASSED (367/367)
+# ================================================
 
 Expected tail of the log:
 
